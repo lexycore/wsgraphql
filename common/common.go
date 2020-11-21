@@ -4,37 +4,37 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/eientei/wsgraphql/mutcontext"
-	"github.com/eientei/wsgraphql/proto"
+	"github.com/lexycore/wsgraphql/mutcontext"
+	"github.com/lexycore/wsgraphql/proto"
 )
 
 const (
-	// context key for http request
-	KeyHttpRequest = "wsgraphql_http_request"
+	// KeyHTTPRequest is a context key for http request
+	KeyHTTPRequest = "wsgraphql_http_request"
 )
 
 var (
-	// schema requirement error
+	// ErrSchemaRequired is a schema requirement error
 	ErrSchemaRequired = errors.New("schema is required")
 
-	// error issued when plain http request is ignored, for FuncPlainFail callback
-	ErrPlainHttpIgnored = errors.New("plain http request ignored")
+	// ErrPlainHTTPIgnored is an error issued when plain http request is ignored, for FuncPlainFail callback
+	ErrPlainHTTPIgnored = errors.New("plain http request ignored")
 )
 
-// prototype for OnConnect callback
-type FuncConnectCallback func(globalctx mutcontext.MutableContext, parameters interface{}) error
+// FuncConnectCallback is a prototype for OnConnect callback
+type FuncConnectCallback func(globalCtx mutcontext.MutableContext, parameters interface{}) error
 
-// prototype for OnOperation callback
-type FuncOperationCallback func(globalctx, opctx mutcontext.MutableContext, operation *proto.PayloadOperation) error
+// FuncOperationCallback is a prototype for OnOperation callback
+type FuncOperationCallback func(globalCtx, opctx mutcontext.MutableContext, operation *proto.PayloadOperation) error
 
-// prototype for OnOperationDone callback
-type FuncOperationDoneCallback func(globalctx, opctx mutcontext.MutableContext, operation *proto.PayloadOperation) error
+// FuncOperationDoneCallback is a prototype for OnOperationDone callback
+type FuncOperationDoneCallback func(globalCtx, opctx mutcontext.MutableContext, operation *proto.PayloadOperation) error
 
-// prototype for OnDisconnect callback
-type FuncDisconnectCallback func(globalctx mutcontext.MutableContext) error
+// FuncDisconnectCallback is a prototype for OnDisconnect callback
+type FuncDisconnectCallback func(globalCtx mutcontext.MutableContext) error
 
-// prototype for OnPlainFail callback
-type FuncPlainFail func(globalctx mutcontext.MutableContext, r *http.Request, w http.ResponseWriter, err error)
+// FuncPlainFail is a prototype for OnPlainFail callback
+type FuncPlainFail func(globalCtx mutcontext.MutableContext, r *http.Request, w http.ResponseWriter, err error)
 
-// prototype for OnPlainInit callback
-type FuncPlainInit func(globalctx mutcontext.MutableContext, r *http.Request, w http.ResponseWriter)
+// FuncPlainInit is a prototype for OnPlainInit callback
+type FuncPlainInit func(globalCtx mutcontext.MutableContext, r *http.Request, w http.ResponseWriter)

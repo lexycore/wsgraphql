@@ -1,8 +1,8 @@
-module github.com/eientei/wsgraphql
+module github.com/lexycore/wsgraphql
 
-go 1.13
+go 1.14
 
 require (
-	github.com/gorilla/websocket v1.4.1
-	github.com/graphql-go/graphql v0.7.8
+	github.com/gorilla/websocket v1.4.2
+	github.com/graphql-go/graphql v0.7.9
 )

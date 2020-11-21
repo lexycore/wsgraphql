@@ -1,16 +1,15 @@
-// Implemenentation of GraphQL over WebSocket Protocol by apollographql
+// Package proto is an implementation of GraphQL over WebSocket Protocol by apollographql
 // https://github.com/apollographql/subscriptions-transport-ws/blob/master/PROTOCOL.md
 package proto
 
 import "encoding/json"
 
-// OperationMessage type
+// OperationType is OperationMessage type
 type OperationType string
 
+// Pseudo types, used in events to signal state changes
 const (
 	GQLUnknown OperationType = ""
-
-	// Pseudo types, used in events to signal state changes
 
 	GQLConnectionClose = "connection_close"
 
@@ -31,48 +30,48 @@ const (
 	GQLConnectionKeepAlive = "ka"
 )
 
-// Creates new operation message
+// NewMessage creates new operation message
 func NewMessage(id interface{}, payload interface{}, t OperationType) *Message {
 	return &Message{
-		Id:      id,
+		ID:      id,
 		Payload: &PayloadBytes{Value: payload},
 		Type:    t,
 	}
 }
 
-// Generic Message type
+// Message generic type
 type Message struct {
-	Id      interface{}   `json:"id"`
+	ID      interface{}   `json:"id"`
 	Payload *PayloadBytes `json:"payload"`
 	Type    OperationType `json:"type"`
 }
 
-// PayloadBytes for operation parametrization
+// PayloadOperation for operation parametrization
 type PayloadOperation struct {
 	Query         string                 `json:"query"`
 	Variables     map[string]interface{} `json:"variables"`
 	OperationName string                 `json:"operationName"`
 }
 
-// PayloadBytes for result of operation execution
+// PayloadData for result of operation execution
 type PayloadData struct {
 	Data   interface{} `json:"data"`
 	Errors []error     `json:"errors"`
 }
 
-// Utility combining functionality of interface{} and json.RawMessage
+// PayloadBytes combines functionality of interface{} and json.RawMessage
 type PayloadBytes struct {
 	Bytes []byte
 	Value interface{}
 }
 
-// Save bytes for later deserialization, just as json.RawMessage
+// UnmarshalJSON saves bytes for later deserialization, just as json.RawMessage
 func (payload *PayloadBytes) UnmarshalJSON(b []byte) error {
 	payload.Bytes = b
 	return nil
 }
 
-// Serialize interface value
+// MarshalJSON serializes interface value
 func (payload *PayloadBytes) MarshalJSON() ([]byte, error) {
 	return json.Marshal(payload.Value)
 }

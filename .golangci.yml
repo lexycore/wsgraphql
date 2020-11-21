@@ -1,0 +1,53 @@
+run:
+  concurrency: 4
+  deadline: 5m
+  issues-exit-code: 1
+  tests: true
+  skip-files:
+    - "bindata.go"
+
+output:
+  format: colored-line-number
+  print-issued-lines: true
+  print-linter-name: true
+
+linters-settings:
+  govet:
+    check-shadowing: true
+  golint:
+    min-confidence: 0.8
+  gocyclo:
+    min-complexity: 15
+  maligned:
+    suggest-new: true
+  goconst:
+    min-len: 3
+    min-occurrences: 3
+  gocritic:
+
+linters:
+  enable:
+    - goimports
+    - govet
+    - golint
+    - gocyclo
+    - maligned
+    - goconst
+    - gocritic
+    - staticcheck
+    - errcheck
+  disable-all: true
+  fast: true
+
+issues:
+  exclude-use-default: false
+#  exclude-rules:
+#    - linters:
+#        - gocyclo
+#      path: "db/config.go"
+#    - linters:
+#        - gocyclo
+#      path: "model/model.go"
+#    - linters:
+#        - gocritic
+#      path: "migration/migration.go"

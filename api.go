@@ -1,4 +1,4 @@
-// graphql over websocket transport using apollo websocket protocol
+// Package wsgraphql is a graphql over websocket transport using apollo websocket protocol
 //
 // Usage
 //
@@ -34,97 +34,104 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/eientei/wsgraphql/server"
+	"github.com/gorilla/websocket"
 	"github.com/graphql-go/graphql"
 
-	"github.com/eientei/wsgraphql/common"
-
-	"github.com/eientei/wsgraphql/mutcontext"
-
-	"github.com/gorilla/websocket"
+	"github.com/lexycore/wsgraphql/common"
+	"github.com/lexycore/wsgraphql/mutcontext"
+	"github.com/lexycore/wsgraphql/server"
 )
 
 const (
-	KeyHttpRequest = common.KeyHttpRequest
+	// KeyHTTPRequest is a context key for http request
+	KeyHTTPRequest = common.KeyHTTPRequest
 )
 
 var (
-	ErrSchemaRequired   = common.ErrSchemaRequired
-	ErrPlainHttpIgnored = common.ErrPlainHttpIgnored
+	// ErrSchemaRequired is a schema requirement error
+	ErrSchemaRequired = common.ErrSchemaRequired
+	// ErrPlainHTTPIgnored is an error issued when plain http request is ignored, for FuncPlainFail callback
+	ErrPlainHTTPIgnored = common.ErrPlainHTTPIgnored
 )
 
+// FuncConnectCallback is a prototype for OnConnect callback
 type FuncConnectCallback common.FuncConnectCallback
 
+// FuncOperationCallback is a prototype for OnOperation callback
 type FuncOperationCallback common.FuncOperationCallback
 
+// FuncOperationDoneCallback is a prototype for OnOperationDone callback
 type FuncOperationDoneCallback common.FuncOperationDoneCallback
 
+// FuncDisconnectCallback is a prototype for OnDisconnect callback
 type FuncDisconnectCallback common.FuncDisconnectCallback
 
+// FuncPlainInit is a prototype for OnPlainFail callback
 type FuncPlainInit common.FuncPlainInit
 
+// FuncPlainFail is a prototype for OnPlainInit callback
 type FuncPlainFail common.FuncPlainFail
 
 // Config for websocket graphql server
 type Config struct {
-	// websocket upgrader
+	// Upgrader is a websocket upgrader
 	// default: one that simply negotiates 'graphql-ws' protocol
 	Upgrader *websocket.Upgrader
 
-	// graphql schema, required
+	// Schema is a graphql schema, required
 	// default: nil
 	Schema *graphql.Schema
 
-	// called when new client is connecting with new parameters or new plain request started
+	// OnConnect called when new client is connecting with new parameters or new plain request started
 	// default: nothing
 	OnConnect FuncConnectCallback
 
-	// called when new operation started
+	// OnOperation called when new operation started
 	// default: nothing
 	OnOperation FuncOperationCallback
 
-	// called when operation is complete
+	// OnOperationDone called when operation is complete
 	// default: nothing
 	OnOperationDone FuncOperationDoneCallback
 
-	// called when websocket connection is closed or plain request is served
+	// OnDisconnect called when websocket connection is closed or plain request is served
 	// default: nothing
 	OnDisconnect FuncDisconnectCallback
 
-	// called when new http connection is established
+	// OnPlainInit called when new http connection is established
 	// default: nothing
 	OnPlainInit FuncPlainInit
 
-	// called when failure occured at plain http stages
+	// OnPlainFail called when failure occurred at plain http stages
 	// default: writes back error text
 	OnPlainFail FuncPlainFail
 
-	// if true, plain http connections that can't be upgraded would be ignored and not served as one-off requests
+	// IgnorePlainHTTP if true, plain http connections that can't be upgraded would be ignored and not served as one-off requests
 	// default: false
-	IgnorePlainHttp bool
+	IgnorePlainHTTP bool
 
-	// keep alive period, at which server would send keep-alive messages
+	// KeepAlive is a keep alive period, at which server would send keep-alive messages
 	// default: 20 seconds
 	KeepAlive time.Duration
 }
 
 func setDefault(value, def interface{}) {
 	v := reflect.ValueOf(value).Elem()
-	needdef := false
+	needDef := false
 	switch v.Kind() {
 	case reflect.Chan, reflect.Func, reflect.Map, reflect.Ptr, reflect.Interface, reflect.Slice:
-		needdef = v.IsNil()
+		needDef = v.IsNil()
 	default:
 		zer := reflect.Zero(v.Type())
-		needdef = v.Interface() == zer.Interface()
+		needDef = v.Interface() == zer.Interface()
 	}
 
-	if needdef {
+	if needDef {
 		v.Set(reflect.ValueOf(def))
 	}
 }
 
-// Returns new server instance using supplied config (which could be zero-value)
+// NewServer returns new server instance using supplied config (which could be zero-value)
 func NewServer(config Config) (http.Handler, error) {
 	if config.Schema == nil {
 		return nil, ErrSchemaRequired
@@ -144,7 +151,7 @@ func NewServer(config Config) (http.Handler, error) {
 		OnDisconnect:    common.FuncDisconnectCallback(config.OnDisconnect),
 		OnPlainInit:     common.FuncPlainInit(config.OnPlainInit),
 		OnPlainFail:     common.FuncPlainFail(config.OnPlainFail),
-		IgnorePlainHttp: config.IgnorePlainHttp,
+		IgnorePlainHTTP: config.IgnorePlainHTTP,
 		KeepAlive:       config.KeepAlive,
 	}, nil
 }

@@ -4,12 +4,11 @@ import (
 	"bytes"
 	"errors"
 	"net/http/httptest"
-
-	"github.com/eientei/wsgraphql/server"
-
 	"testing"
 
 	"github.com/graphql-go/graphql"
+
+	"github.com/lexycore/wsgraphql/server"
 )
 
 func TestNewServer_noschema(t *testing.T) {

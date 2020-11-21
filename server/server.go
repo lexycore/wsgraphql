@@ -1,4 +1,4 @@
-// graphql websocket http handler implementation
+// Package server is a graphql websocket http handler implementation
 package server
 
 import (
@@ -9,11 +9,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/eientei/wsgraphql/common"
-
-	"github.com/eientei/wsgraphql/mutcontext"
-
-	"github.com/eientei/wsgraphql/proto"
 	"github.com/gorilla/websocket"
 	"github.com/graphql-go/graphql"
 	"github.com/graphql-go/graphql/gqlerrors"
@@ -21,9 +16,13 @@ import (
 	"github.com/graphql-go/graphql/language/kinds"
 	"github.com/graphql-go/graphql/language/parser"
 	"github.com/graphql-go/graphql/language/source"
+
+	"github.com/lexycore/wsgraphql/common"
+	"github.com/lexycore/wsgraphql/mutcontext"
+	"github.com/lexycore/wsgraphql/proto"
 )
 
-// the Server itself
+// Server itself
 type Server struct {
 	Upgrader        *websocket.Upgrader
 	Schema          *graphql.Schema
@@ -33,63 +32,63 @@ type Server struct {
 	OnDisconnect    common.FuncDisconnectCallback
 	OnPlainInit     common.FuncPlainInit
 	OnPlainFail     common.FuncPlainFail
-	IgnorePlainHttp bool
+	IgnorePlainHTTP bool
 	KeepAlive       time.Duration
 }
 
-// ticker that also closes on stop
+// TickCloser is a ticker that also closes on stop
 type TickCloser struct {
 	Ticker  *time.Ticker
 	Stopped chan bool
 }
 
-// stop also closes
+// Stop also closes
 func (tc *TickCloser) Stop() {
 	tc.Ticker.Stop()
 	close(tc.Stopped)
 }
 
-// internal Event base
+// Event is an internal event base
 type Event interface{}
 
-// posted when Connection negotiation commences
+// EventConnectionInit posted when Connection negotiation commences
 type EventConnectionInit struct {
 	Parameters interface{}
 }
 
-// posted when Connection termination requested
+// EventConnectionTerminate posted when Connection termination requested
 type EventConnectionTerminate struct {
 }
 
-// posted when Connection read was closed
+// EventConnectionReadClosed posted when Connection read was closed
 type EventConnectionReadClosed struct {
 }
 
-// posted when Connection write was closed
+// EventConnectionWriteClosed posted when Connection write was closed
 type EventConnectionWriteClosed struct {
 }
 
-// posted when Connection timer was closed
+// EventConnectionTimerClosed posted when Connection timer was closed
 type EventConnectionTimerClosed struct {
 }
 
-// posted when new operation requested
+// EventOperationStart posted when new operation requested
 type EventOperationStart struct {
-	Id      interface{}
+	ID      interface{}
 	Payload *proto.PayloadOperation
 }
 
-// posted when operation interruption requested
+// EventOperationStop posted when operation interruption requested
 type EventOperationStop struct {
-	Id interface{}
+	ID interface{}
 }
 
-// posted when operation completed
+// EventOperationComplete posted when operation completed
 type EventOperationComplete struct {
-	Id interface{}
+	ID interface{}
 }
 
-// base Connection state
+// Connection base state
 type Connection struct {
 	Server        *Server
 	Subscriptions map[interface{}]*Subscription
@@ -97,27 +96,27 @@ type Connection struct {
 	Outgoing      chan *proto.Message
 	Events        chan Event
 	TickCloser    *TickCloser
-	Stopcounter   int32
+	StopCounter   int32
 }
 
-// base operation/Subscription state
+// Subscription is a base operation/Subscription state
 type Subscription struct {
-	Id      interface{}
+	ID      interface{}
 	Payload *proto.PayloadOperation
 	Context mutcontext.MutableContext
 }
 
-// reading bytes from websocket to messages, posting events
+// ReadLoop reading bytes from websocket to messages, posting events
 func (conn *Connection) ReadLoop(ws *websocket.Conn) {
 	ws.SetReadLimit(-1)
 	_ = ws.SetReadDeadline(time.Time{})
-	payloadbytes := &proto.PayloadBytes{}
+	payloadBytes := &proto.PayloadBytes{}
 	template := proto.Message{
-		Payload: payloadbytes,
+		Payload: payloadBytes,
 	}
 	for {
-		payloadbytes.Value = nil
-		payloadbytes.Bytes = nil
+		payloadBytes.Value = nil
+		payloadBytes.Bytes = nil
 		msg := template
 
 		err := ws.ReadJSON(&msg)
@@ -129,8 +128,8 @@ func (conn *Connection) ReadLoop(ws *websocket.Conn) {
 		switch msg.Type {
 		case proto.GQLConnectionInit:
 			var value interface{}
-			if len(payloadbytes.Bytes) > 0 {
-				err := json.Unmarshal(payloadbytes.Bytes, &value)
+			if len(payloadBytes.Bytes) > 0 {
+				err := json.Unmarshal(payloadBytes.Bytes, &value)
 				if err != nil {
 					conn.Outgoing <- proto.NewMessage("", err.Error(), proto.GQLConnectionError)
 					continue
@@ -142,18 +141,18 @@ func (conn *Connection) ReadLoop(ws *websocket.Conn) {
 			}
 		case proto.GQLStart:
 			payload := &proto.PayloadOperation{}
-			err := json.Unmarshal(payloadbytes.Bytes, payload)
+			err := json.Unmarshal(payloadBytes.Bytes, payload)
 			if err != nil {
 				conn.Outgoing <- proto.NewMessage("", err.Error(), proto.GQLError)
 				continue
 			}
 			conn.Events <- &EventOperationStart{
-				Id:      msg.Id,
+				ID:      msg.ID,
 				Payload: payload,
 			}
 		case proto.GQLStop:
 			conn.Events <- &EventOperationStop{
-				Id: msg.Id,
+				ID: msg.ID,
 			}
 		case proto.GQLConnectionTerminate:
 			conn.Events <- &EventConnectionTerminate{}
@@ -161,7 +160,7 @@ func (conn *Connection) ReadLoop(ws *websocket.Conn) {
 	}
 }
 
-// writes messages to websocket
+// WriteLoop writes messages to websocket
 func (conn *Connection) WriteLoop(ws *websocket.Conn) {
 	for {
 		select {
@@ -192,7 +191,7 @@ func (conn *Connection) WriteLoop(ws *websocket.Conn) {
 	}
 }
 
-// helper function to parse request into graphql AST
+// MakeAST helper function to parse request into graphql AST
 func MakeAST(query string, schema *graphql.Schema) (*ast.Document, *graphql.Result) {
 	src := source.NewSource(&source.Source{
 		Body: []byte(query),
@@ -214,127 +213,12 @@ func MakeAST(query string, schema *graphql.Schema) (*ast.Document, *graphql.Resu
 	return AST, nil
 }
 
-// Event reactor
+// EventLoop is an event reactor
 func (conn *Connection) EventLoop() {
-	var err error
-loop:
 	for raw := range conn.Events {
-		switch evt := raw.(type) {
-		case *EventConnectionInit:
-			if conn.Server.OnConnect != nil {
-				err = conn.Server.OnConnect(conn.Context, evt.Parameters)
-				if err != nil {
-					conn.Outgoing <- proto.NewMessage("", err.Error(), proto.GQLConnectionError)
-					continue
-				}
-			}
-			conn.Outgoing <- proto.NewMessage("", nil, proto.GQLConnectionAck)
-			conn.Outgoing <- proto.NewMessage("", nil, proto.GQLConnectionKeepAlive)
-		case *EventOperationStart:
-			ctx := mutcontext.CreateNewCancel(context.WithCancel(conn.Context))
-			if conn.Server.OnOperation != nil {
-				err = conn.Server.OnOperation(conn.Context, ctx, evt.Payload)
-				if err != nil {
-					conn.Outgoing <- proto.NewMessage(evt.Id, err.Error(), proto.GQLError)
-					continue
-				}
-			}
-			conn.Subscriptions[evt.Id] = &Subscription{
-				Id:      evt.Id,
-				Payload: evt.Payload,
-				Context: ctx,
-			}
-			atomic.AddInt32(&conn.Stopcounter, -1)
-			go func(sub *Subscription) {
-				AST, res := MakeAST(sub.Payload.Query, conn.Server.Schema)
-				if res != nil {
-					conn.Outgoing <- proto.NewMessage(sub.Id, res, proto.GQLData)
-					conn.Events <- &EventOperationComplete{
-						Id: evt.Id,
-					}
-					return
-				}
-
-				issub := false
-				for _, n := range AST.Definitions {
-					if n.GetKind() == kinds.OperationDefinition {
-						op, ok := n.(*ast.OperationDefinition)
-						if !ok {
-							continue
-						}
-						if op.Operation == ast.OperationTypeSubscription {
-							issub = true
-							break
-						}
-					}
-				}
-
-				for {
-					res := graphql.Execute(graphql.ExecuteParams{
-						Schema:        *conn.Server.Schema,
-						Root:          nil,
-						AST:           AST,
-						OperationName: sub.Payload.OperationName,
-						Args:          sub.Payload.Variables,
-						Context:       sub.Context,
-					})
-
-					conn.Outgoing <- proto.NewMessage(sub.Id, res, proto.GQLData)
-
-					if len(res.Errors) > 0 || !issub || sub.Context.Err() != nil || sub.Context.Completed() {
-						break
-					}
-				}
-				conn.Events <- &EventOperationComplete{
-					Id: evt.Id,
-				}
-			}(conn.Subscriptions[evt.Id])
-		case *EventOperationStop:
-			if sub, ok := conn.Subscriptions[evt.Id]; ok {
-				_ = sub.Context.Cancel()
-			}
-		case *EventOperationComplete:
-			atomic.AddInt32(&conn.Stopcounter, 1)
-			if atomic.LoadInt32(&conn.Stopcounter) >= 2 {
-				break loop
-			}
-
-			conn.Outgoing <- proto.NewMessage(evt.Id, nil, proto.GQLComplete)
-			sub := conn.Subscriptions[evt.Id]
-			if conn.Server.OnOperationDone != nil {
-				err = conn.Server.OnOperationDone(conn.Context, sub.Context, sub.Payload)
-				if err != nil {
-					conn.Outgoing <- proto.NewMessage("", err.Error(), proto.GQLConnectionClose)
-				}
-			}
-			delete(conn.Subscriptions, evt.Id)
-		case *EventConnectionTerminate:
-			conn.Outgoing <- proto.NewMessage("", nil, proto.GQLConnectionClose)
-		case *EventConnectionWriteClosed:
-			atomic.AddInt32(&conn.Stopcounter, 1)
-			if conn.TickCloser != nil {
-				conn.TickCloser.Stop()
-			}
-			go func() {
-				for range conn.Outgoing {
-				}
-			}()
-			if atomic.LoadInt32(&conn.Stopcounter) >= 2 {
-				break loop
-			}
-		case *EventConnectionReadClosed:
-			conn.Context.Cancel()
-			atomic.AddInt32(&conn.Stopcounter, 1)
-			if atomic.LoadInt32(&conn.Stopcounter) >= 2 {
-				break loop
-			}
-		case *EventConnectionTimerClosed:
-			atomic.AddInt32(&conn.Stopcounter, 1)
-			if atomic.LoadInt32(&conn.Stopcounter) >= 2 {
-				break loop
-			}
+		if !conn.processEvents(raw) {
+			break
 		}
-
 	}
 	close(conn.Events)
 	close(conn.Outgoing)
@@ -344,11 +228,135 @@ loop:
 	}
 }
 
-// serve plain http request
+// nolint:gocyclo // cyclomatic complexity 22 of func `(*Connection).processEvents` is high (> 15)
+func (conn *Connection) processEvents(raw Event) bool {
+	var err error
+	switch evt := raw.(type) {
+	case *EventConnectionInit:
+		if conn.Server.OnConnect != nil {
+			err = conn.Server.OnConnect(conn.Context, evt.Parameters)
+			if err != nil {
+				conn.Outgoing <- proto.NewMessage("", err.Error(), proto.GQLConnectionError)
+				return true
+			}
+		}
+		conn.Outgoing <- proto.NewMessage("", nil, proto.GQLConnectionAck)
+		conn.Outgoing <- proto.NewMessage("", nil, proto.GQLConnectionKeepAlive)
+	case *EventOperationStart:
+		ctx := mutcontext.CreateNewCancel(context.WithCancel(conn.Context))
+		if conn.Server.OnOperation != nil {
+			err = conn.Server.OnOperation(conn.Context, ctx, evt.Payload)
+			if err != nil {
+				conn.Outgoing <- proto.NewMessage(evt.ID, err.Error(), proto.GQLError)
+				return true
+			}
+		}
+		conn.Subscriptions[evt.ID] = &Subscription{
+			ID:      evt.ID,
+			Payload: evt.Payload,
+			Context: ctx,
+		}
+		atomic.AddInt32(&conn.StopCounter, -1)
+		go conn.eventOperationStart(conn.Subscriptions[evt.ID], evt)
+	case *EventOperationStop:
+		if sub, ok := conn.Subscriptions[evt.ID]; ok {
+			_ = sub.Context.Cancel()
+		}
+	case *EventOperationComplete:
+		atomic.AddInt32(&conn.StopCounter, 1)
+		if atomic.LoadInt32(&conn.StopCounter) >= 2 {
+			return false
+		}
+
+		conn.Outgoing <- proto.NewMessage(evt.ID, nil, proto.GQLComplete)
+		sub := conn.Subscriptions[evt.ID]
+		if conn.Server.OnOperationDone != nil {
+			err = conn.Server.OnOperationDone(conn.Context, sub.Context, sub.Payload)
+			if err != nil {
+				conn.Outgoing <- proto.NewMessage("", err.Error(), proto.GQLConnectionClose)
+			}
+		}
+		delete(conn.Subscriptions, evt.ID)
+	case *EventConnectionTerminate:
+		conn.Outgoing <- proto.NewMessage("", nil, proto.GQLConnectionClose)
+	case *EventConnectionWriteClosed:
+		atomic.AddInt32(&conn.StopCounter, 1)
+		if conn.TickCloser != nil {
+			conn.TickCloser.Stop()
+		}
+		go func() {
+			for range conn.Outgoing {
+			}
+		}()
+		if atomic.LoadInt32(&conn.StopCounter) >= 2 {
+			return false
+		}
+	case *EventConnectionReadClosed:
+		_ = conn.Context.Cancel()
+		atomic.AddInt32(&conn.StopCounter, 1)
+		if atomic.LoadInt32(&conn.StopCounter) >= 2 {
+			return false
+		}
+	case *EventConnectionTimerClosed:
+		atomic.AddInt32(&conn.StopCounter, 1)
+		if atomic.LoadInt32(&conn.StopCounter) >= 2 {
+			return false
+		}
+	}
+	return true
+}
+
+func (conn *Connection) eventOperationStart(sub *Subscription, evt *EventOperationStart) {
+	AST, res := MakeAST(sub.Payload.Query, conn.Server.Schema)
+	if res != nil {
+		conn.Outgoing <- proto.NewMessage(sub.ID, res, proto.GQLData)
+		conn.Events <- &EventOperationComplete{
+			ID: evt.ID,
+		}
+		return
+	}
+
+	isSub := false
+	for _, n := range AST.Definitions {
+		if n.GetKind() == kinds.OperationDefinition {
+			op, ok := n.(*ast.OperationDefinition)
+			if !ok {
+				continue
+			}
+			if op.Operation == ast.OperationTypeSubscription {
+				isSub = true
+				break
+			}
+		}
+	}
+
+	for {
+		res := graphql.Execute(graphql.ExecuteParams{
+			Schema:        *conn.Server.Schema,
+			Root:          nil,
+			AST:           AST,
+			OperationName: sub.Payload.OperationName,
+			Args:          sub.Payload.Variables,
+			Context:       sub.Context,
+		})
+
+		conn.Outgoing <- proto.NewMessage(sub.ID, res, proto.GQLData)
+
+		if len(res.Errors) > 0 || !isSub || sub.Context.Err() != nil || sub.Context.Completed() {
+			break
+		}
+	}
+	conn.Events <- &EventOperationComplete{
+		ID: evt.ID,
+	}
+}
+
+// ServePlainHTTP serves plain http request
+// nolint:gocyclo // cyclomatic complexity 16 of func `(*Server).ServePlainHTTP` is high (> 15)
 func (server *Server) ServePlainHTTP(ctx mutcontext.MutableContext, w http.ResponseWriter, r *http.Request) {
-	if server.IgnorePlainHttp {
+	if server.IgnorePlainHTTP {
 		if server.OnPlainFail != nil {
-			server.OnPlainFail(ctx, r, w, common.ErrPlainHttpIgnored)
+			server.OnPlainFail(ctx, r, w, common.ErrPlainHTTPIgnored)
 		}
 		return
 	}
@@ -372,10 +380,10 @@ func (server *Server) ServePlainHTTP(ctx mutcontext.MutableContext, w http.Respo
 		}
 	}
 
-	body, err := ioutil.ReadAll(r.Body)
-	if err != nil {
+	body, errRead := ioutil.ReadAll(r.Body)
+	if errRead != nil {
 		if server.OnPlainFail != nil {
-			server.OnPlainFail(ctx, r, w, err)
+			server.OnPlainFail(ctx, r, w, errRead)
 		}
 		return
 	}
@@ -388,9 +396,9 @@ func (server *Server) ServePlainHTTP(ctx mutcontext.MutableContext, w http.Respo
 		return
 	}
 
-	opctx := mutcontext.CreateNewCancel(context.WithCancel(ctx))
+	opCtx := mutcontext.CreateNewCancel(context.WithCancel(ctx))
 	if server.OnOperation != nil {
-		err = server.OnOperation(ctx, opctx, payload)
+		err = server.OnOperation(ctx, opCtx, payload)
 		if err != nil {
 			result = err.Error()
 			return
@@ -408,14 +416,14 @@ func (server *Server) ServePlainHTTP(ctx mutcontext.MutableContext, w http.Respo
 	result = graphql.Do(params)
 
 	if server.OnOperationDone != nil {
-		_ = server.OnOperationDone(ctx, opctx, payload)
+		_ = server.OnOperationDone(ctx, opCtx, payload)
 	}
 	if server.OnDisconnect != nil {
 		_ = server.OnDisconnect(ctx)
 	}
 }
 
-// serve websocket http request
+// ServeWebsocketHTTP serves websocket http request
 func (server *Server) ServeWebsocketHTTP(ctx mutcontext.MutableContext, w http.ResponseWriter, r *http.Request) {
 	ws, err := server.Upgrader.Upgrade(w, r, nil)
 	if err != nil {
@@ -451,7 +459,7 @@ func (server *Server) ServeWebsocketHTTP(ctx mutcontext.MutableContext, w http.R
 	go conn.EventLoop()
 
 	if conn.TickCloser != nil {
-		atomic.AddInt32(&conn.Stopcounter, -1)
+		atomic.AddInt32(&conn.StopCounter, -1)
 		go func() {
 			for {
 				select {
@@ -466,10 +474,10 @@ func (server *Server) ServeWebsocketHTTP(ctx mutcontext.MutableContext, w http.R
 	}
 }
 
-// http.Handler entrypoint
+// ServeHTTP is an http.Handler entrypoint
 func (server *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := mutcontext.CreateNewCancel(context.WithCancel(context.Background()))
-	ctx.Set(common.KeyHttpRequest, r)
+	ctx.Set(common.KeyHTTPRequest, r)
 
 	if server.OnPlainInit != nil {
 		server.OnPlainInit(ctx, r, w)

@@ -7,8 +7,8 @@ import (
 
 func TestNewMessage(t *testing.T) {
 	msg := NewMessage("abc", 123, GQLStop)
-	if msg.Id != "abc" {
-		t.Error("msg id invalid", msg.Id)
+	if msg.ID != "abc" {
+		t.Error("msg id invalid", msg.ID)
 	}
 	if msg.Payload == nil {
 		t.Error("msg payload nil")

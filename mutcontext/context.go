@@ -1,4 +1,4 @@
-// Mutable context, allows for easy setting additional values shared across all context and it's children
+// Package mutcontext implements mutable context allowing easy adding values shared across all context and it's children
 package mutcontext
 
 import (
@@ -8,13 +8,13 @@ import (
 	"time"
 )
 
-// returned if no cancel func present
+// ErrNoCancel returned if no cancel func present
 var ErrNoCancel = errors.New("no cancel func")
 
-// cleanup closure
+// FuncCleanup is a cleanup closure
 type FuncCleanup func()
 
-// Mutable context interface, allows easy setting values and keeping cancel() function
+// MutableContext interface, allows easy setting values and keeping cancel() function
 type MutableContext interface {
 	context.Context
 	Set(key, value interface{})
@@ -34,22 +34,22 @@ type mutableContext struct {
 	mutex       *sync.Mutex
 }
 
-// Pass-through to parent context
+// Deadline is a pass-through to parent context
 func (ctx *mutableContext) Deadline() (deadline time.Time, ok bool) {
 	return ctx.Context.Deadline()
 }
 
-// Pass-through to parent context
+// Done is a pass-through to parent context
 func (ctx *mutableContext) Done() <-chan struct{} {
 	return ctx.Context.Done()
 }
 
-// Pass-through to parent context
+// Err is a pass-through to parent context
 func (ctx *mutableContext) Err() error {
 	return ctx.Context.Err()
 }
 
-// If contained in local map, use that, otherwise pass-through to parent context
+// Value is a pass-through to parent context if value is not in a local map. If exists - use local
 func (ctx *mutableContext) Value(key interface{}) interface{} {
 	ctx.mutex.Lock()
 	defer ctx.mutex.Unlock()
@@ -59,14 +59,14 @@ func (ctx *mutableContext) Value(key interface{}) interface{} {
 	return ctx.Context.Value(key)
 }
 
-// Put value in local map
+// Set value in local map
 func (ctx *mutableContext) Set(key, value interface{}) {
 	ctx.mutex.Lock()
 	defer ctx.mutex.Unlock()
 	ctx.Values[key] = value
 }
 
-// If have cancel() function, use that, otherwise return error
+// Cancel calls cancel() function if there is one, otherwise returns an error
 func (ctx *mutableContext) Cancel() error {
 	if ctx.IsComplete {
 		return ctx.Err()
@@ -79,12 +79,12 @@ func (ctx *mutableContext) Cancel() error {
 	return nil
 }
 
-// assigned cleanup function
+// SetCleanup is an assigned cleanup function
 func (ctx *mutableContext) SetCleanup(cleanup FuncCleanup) {
 	ctx.CleanupFunc = cleanup
 }
 
-// complete context gracefully
+// Complete context gracefully
 func (ctx *mutableContext) Complete() {
 	if ctx.IsComplete {
 		return
@@ -96,26 +96,26 @@ func (ctx *mutableContext) Complete() {
 	}
 }
 
-// indicates context was completed normally
+// Completed indicates context was completed normally
 func (ctx *mutableContext) Completed() bool {
 	return ctx.IsComplete
 }
 
-// Constructor without cancel() function, will make ctx.Cancel() != nil
+// CreateNew is a constructor without cancel() function, will make ctx.Cancel() != nil
 func CreateNew(ctx context.Context) MutableContext {
 	return &mutableContext{
 		Context: ctx,
 		Values:  make(map[interface{}]interface{}),
-		mutex: &sync.Mutex{},
+		mutex:   &sync.Mutex{},
 	}
 }
 
-// Constructor with cancel() function
+// CreateNewCancel is a constructor with cancel() function
 func CreateNewCancel(ctx context.Context, cancel context.CancelFunc) MutableContext {
 	return &mutableContext{
 		Context:    ctx,
 		CancelFunc: cancel,
 		Values:     make(map[interface{}]interface{}),
-		mutex: &sync.Mutex{},
+		mutex:      &sync.Mutex{},
 	}
 }

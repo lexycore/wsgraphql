@@ -9,12 +9,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/eientei/wsgraphql/proto"
-
-	"github.com/eientei/wsgraphql/mutcontext"
-
 	"github.com/gorilla/websocket"
 	"github.com/graphql-go/graphql"
+
+	"github.com/lexycore/wsgraphql/mutcontext"
+	"github.com/lexycore/wsgraphql/proto"
+)
+
+const (
+	jsonDataFoo34 = `{"data":{"foo":34}}`
 )
 
 func makeRequest(t *testing.T, listener net.Listener, query string) string {
@@ -85,7 +88,7 @@ func TestServer_ServeHTTP_singular(t *testing.T) {
 	}
 	listener := makeServer(&schema)
 	resp := makeRequest(t, listener, `{"query": "query { foo }"}`)
-	if resp != `{"data":{"foo":34}}` {
+	if resp != jsonDataFoo34 {
 		t.Error("invalid response", resp)
 	}
 
@@ -115,39 +118,39 @@ func TestServer_ServeHTTP_websocket_query(t *testing.T) {
 	wait := make(chan bool)
 	go func() {
 		ack := &proto.Message{}
-		err := conn.ReadJSON(ack)
-		if err != nil {
-			t.Error("error", err)
+		err2 := conn.ReadJSON(ack)
+		if err2 != nil {
+			t.Error("error", err2)
 		}
 		if ack.Type != proto.GQLConnectionAck {
 			t.Error("Invalid ack")
 		}
 
 		ka := &proto.Message{}
-		err = conn.ReadJSON(ka)
-		if err != nil {
-			t.Error("error", err)
+		err2 = conn.ReadJSON(ka)
+		if err2 != nil {
+			t.Error("error", err2)
 		}
 		if ka.Type != proto.GQLConnectionKeepAlive {
 			t.Error("Invalid keepalive")
 		}
 
 		data := &proto.Message{}
-		err = conn.ReadJSON(data)
-		if err != nil {
-			t.Error("error", err)
+		err2 = conn.ReadJSON(data)
+		if err2 != nil {
+			t.Error("error", err2)
 		}
 		if data.Type != proto.GQLData {
 			t.Error("Invalid data type")
 		}
-		if string(data.Payload.Bytes) != `{"data":{"foo":34}}` {
+		if string(data.Payload.Bytes) != jsonDataFoo34 {
 			t.Error("invalid response", string(data.Payload.Bytes))
 		}
 
 		compl := &proto.Message{}
-		err = conn.ReadJSON(compl)
-		if err != nil {
-			t.Error("error", err)
+		err2 = conn.ReadJSON(compl)
+		if err2 != nil {
+			t.Error("error", err2)
 		}
 		if compl.Type != proto.GQLComplete {
 			t.Error("Invalid complete")
@@ -155,12 +158,12 @@ func TestServer_ServeHTTP_websocket_query(t *testing.T) {
 		close(wait)
 	}()
 
-	err = conn.WriteJSON(map[string]interface{}{
+	_ = conn.WriteJSON(map[string]interface{}{
 		"type":    proto.GQLConnectionInit,
 		"payload": 123,
 	})
 
-	err = conn.WriteJSON(map[string]interface{}{
+	_ = conn.WriteJSON(map[string]interface{}{
 		"id":   "1",
 		"type": proto.GQLStart,
 		"payload": map[string]interface{}{
@@ -169,14 +172,14 @@ func TestServer_ServeHTTP_websocket_query(t *testing.T) {
 	})
 
 	<-wait
-	err = conn.WriteJSON(map[string]interface{}{
+	_ = conn.WriteJSON(map[string]interface{}{
 		"type": proto.GQLConnectionTerminate,
 	})
 	_ = listener.Close()
 }
 
 func TestServer_ServeHTTP_websocket_subscription(t *testing.T) {
-	cleanupcalled := false
+	cleanupCalled := false
 
 	schema, err := graphql.NewSchema(graphql.SchemaConfig{
 		Query: graphql.NewObject(graphql.ObjectConfig{
@@ -198,12 +201,12 @@ func TestServer_ServeHTTP_websocket_subscription(t *testing.T) {
 						if v == nil {
 							ctx.Set("idx", 6)
 							ctx.SetCleanup(func() {
-								cleanupcalled = true
+								cleanupCalled = true
 							})
 							v = 6
 						}
 						idx := v.(int)
-						idx -= 1
+						idx--
 						ctx.Set("idx", idx)
 						if idx <= 0 {
 							ctx.Complete()
@@ -223,18 +226,18 @@ func TestServer_ServeHTTP_websocket_subscription(t *testing.T) {
 	wait := make(chan bool)
 	go func() {
 		ack := &proto.Message{}
-		err := conn.ReadJSON(ack)
-		if err != nil {
-			t.Error("error", err)
+		err2 := conn.ReadJSON(ack)
+		if err2 != nil {
+			t.Error("error", err2)
 		}
 		if ack.Type != proto.GQLConnectionAck {
 			t.Error("Invalid ack")
 		}
 
 		ka := &proto.Message{}
-		err = conn.ReadJSON(ka)
-		if err != nil {
-			t.Error("error", err)
+		err2 = conn.ReadJSON(ka)
+		if err2 != nil {
+			t.Error("error", err2)
 		}
 		if ka.Type != proto.GQLConnectionKeepAlive {
 			t.Error("Invalid keepalive")
@@ -242,22 +245,22 @@ func TestServer_ServeHTTP_websocket_subscription(t *testing.T) {
 
 		for i := 0; i < 6; i++ {
 			data := &proto.Message{}
-			err = conn.ReadJSON(data)
-			if err != nil {
-				t.Error("error", err)
+			err2 = conn.ReadJSON(data)
+			if err2 != nil {
+				t.Error("error", err2)
 			}
 			if data.Type != proto.GQLData {
 				t.Error("Invalid data type")
 			}
-			if string(data.Payload.Bytes) != `{"data":{"foo":34}}` {
+			if string(data.Payload.Bytes) != jsonDataFoo34 {
 				t.Error("invalid response", string(data.Payload.Bytes))
 			}
 		}
 
 		compl := &proto.Message{}
-		err = conn.ReadJSON(compl)
-		if err != nil {
-			t.Error("error", err)
+		err2 = conn.ReadJSON(compl)
+		if err2 != nil {
+			t.Error("error", err2)
 		}
 		if compl.Type != proto.GQLComplete {
 			t.Error("Invalid complete")
@@ -265,12 +268,12 @@ func TestServer_ServeHTTP_websocket_subscription(t *testing.T) {
 		close(wait)
 	}()
 
-	err = conn.WriteJSON(map[string]interface{}{
+	_ = conn.WriteJSON(map[string]interface{}{
 		"type":    proto.GQLConnectionInit,
 		"payload": 123,
 	})
 
-	err = conn.WriteJSON(map[string]interface{}{
+	_ = conn.WriteJSON(map[string]interface{}{
 		"id":   "1",
 		"type": proto.GQLStart,
 		"payload": map[string]interface{}{
@@ -279,11 +282,11 @@ func TestServer_ServeHTTP_websocket_subscription(t *testing.T) {
 	})
 
 	<-wait
-	err = conn.WriteJSON(map[string]interface{}{
+	_ = conn.WriteJSON(map[string]interface{}{
 		"type": proto.GQLConnectionTerminate,
 	})
 	_ = listener.Close()
-	if !cleanupcalled {
+	if !cleanupCalled {
 		t.Error("Cleanup function was not called")
 	}
 }

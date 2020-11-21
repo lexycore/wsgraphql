@@ -6,8 +6,9 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/eientei/wsgraphql/mutcontext"
 	"github.com/graphql-go/graphql"
+
+	"github.com/lexycore/wsgraphql/mutcontext"
 )
 
 func Example() {
@@ -69,9 +70,9 @@ func Example() {
 						newc := make(chan int)
 						ctx.Set("ch", newc)
 						ctx.SetCleanup(func() {
-							c := ctx.Value("ch")
-							if c != nil {
-								close(c.(chan int))
+							cc := ctx.Value("ch")
+							if cc != nil {
+								close(cc.(chan int))
 							}
 						})
 						c = newc
